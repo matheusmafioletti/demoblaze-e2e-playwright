@@ -7,6 +7,13 @@ export class Constants {
     LONG: 30000,
   };
 
+  static readonly PRODUCTS = {
+    LUMIA_1520: 'Nokia lumia 1520',
+    MACBOOK_AIR: 'MacBook air',
+    GALAXY_S6: 'Samsung galaxy s6',
+    APPLE_MONITOR: 'Apple monitor 24'
+  };
+
   static readonly CATEGORIES = {
     PHONES: 'Phones',
     LAPTOPS: 'Laptops',

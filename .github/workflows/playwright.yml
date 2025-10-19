@@ -104,12 +104,13 @@ jobs:
         with:
           path: repo
       
-      - name: Checkout gh-pages branch
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: gh-pages
-        continue-on-error: true
+      - name: Setup gh-pages directory
+        run: |
+          # Try to checkout gh-pages branch, create empty directory if it doesn't exist
+          git clone --depth 1 --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages 2>/dev/null || {
+            echo "gh-pages branch not found, creating new directory"
+            mkdir -p gh-pages
+          }
       
       - name: Download current report
         uses: actions/download-artifact@v4
@@ -222,6 +223,11 @@ jobs:
           sed -i "s|<!-- Reports will be inserted here -->|$REPORT_LIST|g" gh-pages/index.html
           sed -i "s|{{TOTAL_RUNS}}|$REPORT_COUNT|g" gh-pages/index.html
           sed -i "s|{{LATEST_RUN}}|$LATEST_DATE|g" gh-pages/index.html
+          sed -i "s|{{TOTAL_TESTS}}|$TOTAL_TESTS|g" gh-pages/index.html
+          sed -i "s|{{PASSED_TESTS}}|$PASSED_TESTS|g" gh-pages/index.html
+          sed -i "s|{{FAILED_TESTS}}|$FAILED_TESTS|g" gh-pages/index.html
+          sed -i "s|{{SKIPPED_TESTS}}|$SKIPPED_TESTS|g" gh-pages/index.html
+          sed -i "s|{{DURATION}}|$DURATION|g" gh-pages/index.html
           
           echo "✅ Index page created with $REPORT_COUNT reports"
           echo "Latest report: $LATEST_DATE"

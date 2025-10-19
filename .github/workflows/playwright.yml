@@ -117,6 +117,13 @@ jobs:
           name: playwright-report
           path: ./current-report
       
+      - name: Download test results JSON
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results
+        continue-on-error: true
+      
       - name: Prepare history and index page
         run: |
           mkdir -p gh-pages/reports
@@ -127,6 +134,49 @@ jobs:
           
           # Copy current report to history
           cp -r current-report "$REPORT_DIR"
+          
+          # Extract test statistics from JSON
+          TOTAL_TESTS=0
+          PASSED_TESTS=0
+          FAILED_TESTS=0
+          SKIPPED_TESTS=0
+          DURATION="N/A"
+          
+          if [ -f "test-results/results.json" ]; then
+            # Use jq to parse JSON if available, otherwise use grep/sed
+            if command -v jq &> /dev/null; then
+              TOTAL_TESTS=$(jq '[.suites[].specs[]] | length' test-results/results.json 2>/dev/null || echo "0")
+              PASSED_TESTS=$(jq '[.suites[].specs[].tests[] | select(.status == "expected")] | length' test-results/results.json 2>/dev/null || echo "0")
+              FAILED_TESTS=$(jq '[.suites[].specs[].tests[] | select(.status == "unexpected")] | length' test-results/results.json 2>/dev/null || echo "0")
+              SKIPPED_TESTS=$(jq '[.suites[].specs[].tests[] | select(.status == "skipped")] | length' test-results/results.json 2>/dev/null || echo "0")
+              DURATION_MS=$(jq '.stats.duration // 0' test-results/results.json 2>/dev/null || echo "0")
+              
+              # Convert duration to human readable format
+              if [ "$DURATION_MS" -gt 0 ]; then
+                DURATION_SECONDS=$((DURATION_MS / 1000))
+                MINUTES=$((DURATION_SECONDS / 60))
+                SECONDS=$((DURATION_SECONDS % 60))
+                if [ $MINUTES -gt 0 ]; then
+                  DURATION="${MINUTES}m ${SECONDS}s"
+                else
+                  DURATION="${SECONDS}s"
+                fi
+              fi
+            else
+              echo "⚠️ jq not found, using fallback parsing"
+              TOTAL_TESTS=$(grep -o '"title"' test-results/results.json 2>/dev/null | wc -l || echo "0")
+              PASSED_TESTS=$(grep -o '"status":"expected"' test-results/results.json 2>/dev/null | wc -l || echo "0")
+              FAILED_TESTS=$(grep -o '"status":"unexpected"' test-results/results.json 2>/dev/null | wc -l || echo "0")
+              SKIPPED_TESTS=$(grep -o '"status":"skipped"' test-results/results.json 2>/dev/null | wc -l || echo "0")
+            fi
+          fi
+          
+          echo "📊 Test Statistics:"
+          echo "  Total: $TOTAL_TESTS"
+          echo "  Passed: $PASSED_TESTS"
+          echo "  Failed: $FAILED_TESTS"
+          echo "  Skipped: $SKIPPED_TESTS"
+          echo "  Duration: $DURATION"
           
           # Generate report list HTML
           REPORT_LIST=""

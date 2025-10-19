@@ -27,6 +27,23 @@ test.describe('Homepage - Basic Elements', () => {
     await expect(homePage.productContainer).toHaveCount(9);
   });
 
+  test('Should load homepage and click on next page, and previous page', async ({ homePage }) => {
+    await expect(homePage.pageNextButton).toBeVisible();
+    await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.GALAXY_S6);
+    await homePage.pageNextButton.click();
+    await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.APPLE_MONITOR);
+    await homePage.pagePrevButton.click();
+    await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.LUMIA_1520);
+  });
+
+});
+
+test.describe('Homepage - Carousel', () => {
+  test.beforeEach(async ({ homePage, isMobile }) => {
+    test.skip(isMobile, 'Carousel are not displayed on mobile devices');
+    await homePage.goto();
+  });
+
   test('Should load homepage and wait for carousel image to change', async ({ homePage }) => {
     await expect(homePage.carousel).toBeVisible();
     await expect(homePage.carouselItem).toHaveCount(3);
@@ -69,14 +86,4 @@ test.describe('Homepage - Basic Elements', () => {
     expect(initialActiveItem).not.toBe(newActiveItem);
   });
 
-  test('Should load homepage and click on next page, and previous page', async ({ homePage }) => {
-    await expect(homePage.pageNextButton).toBeVisible();
-    await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.GALAXY_S6);
-    await homePage.pageNextButton.click();
-    await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.APPLE_MONITOR);
-    await homePage.pagePrevButton.click();
-    await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.LUMIA_1520);
-  });
-
 });
-

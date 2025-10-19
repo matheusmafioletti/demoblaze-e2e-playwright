@@ -106,11 +106,19 @@ jobs:
       
       - name: Setup gh-pages directory
         run: |
-          # Try to checkout gh-pages branch, create empty directory if it doesn't exist
-          git clone --depth 1 --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages 2>/dev/null || {
-            echo "gh-pages branch not found, creating new directory"
+          # Try to clone gh-pages branch with full history
+          echo "🔍 Attempting to clone gh-pages branch..."
+          if git clone --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages 2>/dev/null; then
+            echo "✅ Successfully cloned gh-pages branch"
+            cd gh-pages
+            echo "📊 Current reports:"
+            ls -la reports/ 2>/dev/null || echo "  No reports directory yet"
+            cd ..
+          else
+            echo "⚠️ gh-pages branch not found (this is normal for first run)"
+            echo "📁 Creating new gh-pages directory"
             mkdir -p gh-pages
-          }
+          fi
       
       - name: Download current report
         uses: actions/download-artifact@v4
@@ -127,14 +135,33 @@ jobs:
       
       - name: Prepare history and index page
         run: |
+          # Debug: Check what we have
+          echo "🔍 Checking downloaded artifacts..."
+          ls -la current-report/ || echo "⚠️ current-report not found"
+          ls -la test-results/ || echo "⚠️ test-results not found"
+          
+          # Create reports directory
           mkdir -p gh-pages/reports
+          
+          # Generate report directory name
           TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
           RUN_NUMBER=${{ github.run_number }}
-          COMMIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           REPORT_DIR="gh-pages/reports/run-${RUN_NUMBER}-${TIMESTAMP}"
           
+          echo "📁 Creating report directory: $REPORT_DIR"
+          
           # Copy current report to history
-          cp -r current-report "$REPORT_DIR"
+          if [ -d "current-report" ] && [ "$(ls -A current-report)" ]; then
+            mkdir -p "$REPORT_DIR"
+            cp -r current-report/* "$REPORT_DIR/"
+            echo "✅ Report copied successfully"
+            echo "📄 Files in report:"
+            ls -la "$REPORT_DIR/" | head -10
+          else
+            echo "❌ ERROR: current-report directory not found or empty"
+            echo "This should not happen - check the upload artifacts step"
+            exit 1
+          fi
           
           # Extract test statistics from JSON
           TOTAL_TESTS=0
@@ -143,41 +170,53 @@ jobs:
           SKIPPED_TESTS=0
           DURATION="N/A"
           
+          echo ""
+          echo "📊 Extracting test statistics..."
+          
           if [ -f "test-results/results.json" ]; then
-            # Use jq to parse JSON if available, otherwise use grep/sed
-            if command -v jq &> /dev/null; then
-              TOTAL_TESTS=$(jq '[.suites[].specs[]] | length' test-results/results.json 2>/dev/null || echo "0")
-              PASSED_TESTS=$(jq '[.suites[].specs[].tests[] | select(.status == "expected")] | length' test-results/results.json 2>/dev/null || echo "0")
-              FAILED_TESTS=$(jq '[.suites[].specs[].tests[] | select(.status == "unexpected")] | length' test-results/results.json 2>/dev/null || echo "0")
-              SKIPPED_TESTS=$(jq '[.suites[].specs[].tests[] | select(.status == "skipped")] | length' test-results/results.json 2>/dev/null || echo "0")
-              DURATION_MS=$(jq '.stats.duration // 0' test-results/results.json 2>/dev/null || echo "0")
-              
-              # Convert duration to human readable format
-              if [ "$DURATION_MS" -gt 0 ]; then
-                DURATION_SECONDS=$((DURATION_MS / 1000))
-                MINUTES=$((DURATION_SECONDS / 60))
-                SECONDS=$((DURATION_SECONDS % 60))
-                if [ $MINUTES -gt 0 ]; then
-                  DURATION="${MINUTES}m ${SECONDS}s"
-                else
-                  DURATION="${SECONDS}s"
-                fi
-              fi
-            else
-              echo "⚠️ jq not found, using fallback parsing"
-              TOTAL_TESTS=$(grep -o '"title"' test-results/results.json 2>/dev/null | wc -l || echo "0")
-              PASSED_TESTS=$(grep -o '"status":"expected"' test-results/results.json 2>/dev/null | wc -l || echo "0")
-              FAILED_TESTS=$(grep -o '"status":"unexpected"' test-results/results.json 2>/dev/null | wc -l || echo "0")
-              SKIPPED_TESTS=$(grep -o '"status":"skipped"' test-results/results.json 2>/dev/null | wc -l || echo "0")
+            echo "✅ Found results.json"
+            
+            # Install jq if not available
+            if ! command -v jq &> /dev/null; then
+              echo "📦 Installing jq..."
+              sudo apt-get update -qq
+              sudo apt-get install -y jq
             fi
+            
+            # Parse JSON with better error handling
+            TOTAL_TESTS=$(jq -r '[.suites[]?.specs[]?] | length' test-results/results.json 2>/dev/null || echo "0")
+            PASSED_TESTS=$(jq -r '[.suites[]?.specs[]?.tests[]? | select(.status == "expected")] | length' test-results/results.json 2>/dev/null || echo "0")
+            FAILED_TESTS=$(jq -r '[.suites[]?.specs[]?.tests[]? | select(.status == "unexpected")] | length' test-results/results.json 2>/dev/null || echo "0")
+            SKIPPED_TESTS=$(jq -r '[.suites[]?.specs[]?.tests[]? | select(.status == "skipped")] | length' test-results/results.json 2>/dev/null || echo "0")
+            DURATION_MS=$(jq -r '.stats.duration // 0' test-results/results.json 2>/dev/null || echo "0")
+            
+            # Convert duration to human readable format
+            if [ "$DURATION_MS" != "0" ] && [ "$DURATION_MS" != "null" ]; then
+              DURATION_SECONDS=$((DURATION_MS / 1000))
+              MINUTES=$((DURATION_SECONDS / 60))
+              SECONDS=$((DURATION_SECONDS % 60))
+              if [ $MINUTES -gt 0 ]; then
+                DURATION="${MINUTES}m ${SECONDS}s"
+              else
+                DURATION="${SECONDS}s"
+              fi
+            fi
+            
+            echo "  Total: $TOTAL_TESTS"
+            echo "  Passed: $PASSED_TESTS"
+            echo "  Failed: $FAILED_TESTS"
+            echo "  Skipped: $SKIPPED_TESTS"
+            echo "  Duration: $DURATION"
+          else
+            echo "⚠️ results.json not found, using default values"
           fi
           
-          echo "📊 Test Statistics:"
-          echo "  Total: $TOTAL_TESTS"
-          echo "  Passed: $PASSED_TESTS"
-          echo "  Failed: $FAILED_TESTS"
-          echo "  Skipped: $SKIPPED_TESTS"
-          echo "  Duration: $DURATION"
+          echo ""
+          echo "📝 Generating report list..."
+          
+          # List all reports in the directory
+          echo "Current reports in gh-pages/reports:"
+          ls -la gh-pages/reports/ || echo "No reports yet"
           
           # Generate report list HTML
           REPORT_LIST=""
@@ -185,10 +224,13 @@ jobs:
           FIRST=true
           LATEST_DATE="N/A"
           
+          # List reports (newest first)
           for report in $(ls -t gh-pages/reports 2>/dev/null); do
             REPORT_COUNT=$((REPORT_COUNT + 1))
             RUN=$(echo $report | cut -d'-' -f2)
             DATE=$(echo $report | sed 's/run-[0-9]*-//' | sed 's/_/ /' | sed 's/-/:/g')
+            
+            echo "  - Found report: $report (Run #$RUN)"
             
             if [ "$FIRST" = true ]; then
               LATEST_DATE="Run #$RUN"
@@ -211,12 +253,20 @@ jobs:
             fi
           done
           
-          # If no reports found
+          echo ""
+          echo "📊 Summary:"
+          echo "  Total reports found: $REPORT_COUNT"
+          echo "  Latest: $LATEST_DATE"
+          
+          # If no reports found (should not happen since we just added one)
           if [ $REPORT_COUNT -eq 0 ]; then
             REPORT_LIST="<li class='report-item'><div class='report-info'><div class='report-title'>No reports available yet</div></div></li>"
+            echo "⚠️ Warning: No reports found after copying!"
           fi
           
           # Create index.html from template
+          echo ""
+          echo "📄 Creating index.html from template..."
           cp repo/.github/templates/reports-index.html gh-pages/index.html
           
           # Replace placeholders
@@ -229,8 +279,11 @@ jobs:
           sed -i "s|{{SKIPPED_TESTS}}|$SKIPPED_TESTS|g" gh-pages/index.html
           sed -i "s|{{DURATION}}|$DURATION|g" gh-pages/index.html
           
-          echo "✅ Index page created with $REPORT_COUNT reports"
-          echo "Latest report: $LATEST_DATE"
+          echo ""
+          echo "✅ Index page created successfully!"
+          echo "   Reports: $REPORT_COUNT"
+          echo "   Tests: $TOTAL_TESTS (✅ $PASSED_TESTS | ❌ $FAILED_TESTS | ⏭️ $SKIPPED_TESTS)"
+          echo "   Duration: $DURATION"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

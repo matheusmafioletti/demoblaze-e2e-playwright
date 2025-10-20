@@ -9,7 +9,22 @@ export default defineConfig({
   reporter: [
     ['html'],
     ['list'],
-    ['json', { outputFile: 'test-results/results.json' }]
+    ['json', { outputFile: 'test-results/results.json' }],
+    ['allure-playwright', { 
+      outputFolder: 'allure-results',
+      detail: true,
+      suiteTitle: true,
+      categories: [
+        {
+          name: 'Flaky tests',
+          matchedStatuses: ['flaky'],
+        },
+        {
+          name: 'Failed tests',
+          matchedStatuses: ['failed'],
+        },
+      ],
+    }]
   ],
   use: {
     baseURL: 'https://www.demoblaze.com',

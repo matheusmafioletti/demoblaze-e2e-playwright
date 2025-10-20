@@ -91,6 +91,21 @@ jobs:
         path: test-results/
         retention-days: 30
 
+    - name: Generate Allure Report
+      if: always()
+      run: |
+        echo "📊 Generating Allure Report..."
+        npm run allure:generate
+        echo "✅ Allure Report generated successfully"
+    
+    - name: Upload Allure Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: allure-report
+        path: allure-report/
+        retention-days: 30
+
   deploy:
     needs: test
     if: github.ref == 'refs/heads/main'
@@ -120,11 +135,17 @@ jobs:
             mkdir -p gh-pages
           fi
       
-      - name: Download current report
+      - name: Download Playwright HTML report
         uses: actions/download-artifact@v4
         with:
           name: playwright-report
           path: ./current-report
+      
+      - name: Download Allure report
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-report
+          path: ./current-allure-report
       
       - name: Download test results JSON
         uses: actions/download-artifact@v4
@@ -138,6 +159,7 @@ jobs:
           # Debug: Check what we have
           echo "🔍 Checking downloaded artifacts..."
           ls -la current-report/ || echo "⚠️ current-report not found"
+          ls -la current-allure-report/ || echo "⚠️ current-allure-report not found"
           ls -la test-results/ || echo "⚠️ test-results not found"
           
           # Create reports directory
@@ -150,17 +172,28 @@ jobs:
           
           echo "📁 Creating report directory: $REPORT_DIR"
           
-          # Copy current report to history
+          # Copy current Playwright HTML report to history
           if [ -d "current-report" ] && [ "$(ls -A current-report)" ]; then
             mkdir -p "$REPORT_DIR"
             cp -r current-report/* "$REPORT_DIR/"
-            echo "✅ Report copied successfully"
+            echo "✅ Playwright HTML report copied successfully"
             echo "📄 Files in report:"
             ls -la "$REPORT_DIR/" | head -10
           else
             echo "❌ ERROR: current-report directory not found or empty"
             echo "This should not happen - check the upload artifacts step"
             exit 1
+          fi
+          
+          # Copy current Allure report to history
+          if [ -d "current-allure-report" ] && [ "$(ls -A current-allure-report)" ]; then
+            mkdir -p "$REPORT_DIR/allure"
+            cp -r current-allure-report/* "$REPORT_DIR/allure/"
+            echo "✅ Allure report copied successfully"
+            echo "📄 Files in allure report:"
+            ls -la "$REPORT_DIR/allure/" | head -10
+          else
+            echo "⚠️ Allure report not found, skipping"
           fi
           
           # Extract test statistics from JSON
@@ -232,6 +265,12 @@ jobs:
             
             echo "  - Found report: $report (Run #$RUN)"
             
+            # Check if allure report exists for this run
+            ALLURE_BUTTON=""
+            if [ -d "gh-pages/reports/$report/allure" ]; then
+              ALLURE_BUTTON="<a class='view-button allure' href='reports/$report/allure/index.html'>📊 Allure</a>"
+            fi
+            
             if [ "$FIRST" = true ]; then
               LATEST_DATE="Run #$RUN"
               REPORT_LIST+="<li class='report-item latest'>"
@@ -239,7 +278,10 @@ jobs:
               REPORT_LIST+="    <div class='report-title'>Run #$RUN <span class='badge'>Latest</span></div>"
               REPORT_LIST+="    <div class='report-meta'>📅 $DATE</div>"
               REPORT_LIST+="  </div>"
-              REPORT_LIST+="  <a class='view-button' href='reports/$report/index.html'>View Report →</a>"
+              REPORT_LIST+="  <div class='report-buttons'>"
+              REPORT_LIST+="    <a class='view-button' href='reports/$report/index.html'>🎭 Playwright</a>"
+              REPORT_LIST+="    $ALLURE_BUTTON"
+              REPORT_LIST+="  </div>"
               REPORT_LIST+="</li>"
               FIRST=false
             else
@@ -248,7 +290,10 @@ jobs:
               REPORT_LIST+="    <div class='report-title'>Run #$RUN</div>"
               REPORT_LIST+="    <div class='report-meta'>📅 $DATE</div>"
               REPORT_LIST+="  </div>"
-              REPORT_LIST+="  <a class='view-button' href='reports/$report/index.html'>View Report →</a>"
+              REPORT_LIST+="  <div class='report-buttons'>"
+              REPORT_LIST+="    <a class='view-button' href='reports/$report/index.html'>🎭 Playwright</a>"
+              REPORT_LIST+="    $ALLURE_BUTTON"
+              REPORT_LIST+="  </div>"
               REPORT_LIST+="</li>"
             fi
           done

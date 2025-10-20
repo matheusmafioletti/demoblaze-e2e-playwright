@@ -105,8 +105,9 @@
       margin: 12px 0;
       padding: 20px;
       border-radius: 12px;
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
       align-items: center;
       transition: all 0.3s ease;
       border-left: 4px solid transparent;
@@ -134,19 +135,34 @@
       font-size: 0.9em;
       color: #718096;
     }
+    .report-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
     .view-button {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 10px 24px;
+      padding: 10px 20px;
       border-radius: 8px;
       text-decoration: none;
       font-weight: 600;
       transition: all 0.3s ease;
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.95em;
+      white-space: nowrap;
     }
     .view-button:hover { 
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .view-button.allure {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    .view-button.allure:hover {
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
     }
     .badge {
       background: #48bb78;
@@ -159,7 +175,16 @@
     }
     @media (max-width: 768px) {
       .header h1 { font-size: 1.8em; }
-      .report-item { flex-direction: column; gap: 15px; text-align: center; }
+      .report-item { 
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+      .report-info {
+        text-align: center;
+      }
+      .report-buttons {
+        justify-content: center;
+      }
       .content { padding: 20px; }
     }
   </style>

@@ -16,9 +16,12 @@
     "test:mobile-safari": "playwright test --project=mobile-safari",
     "report": "playwright show-report",
     "test:report": "playwright test && playwright show-report",
-    "allure:generate": "allure generate allure-results --clean -o allure-report",
+    "allure:history": "node -e \"const fs=require('fs');const path=require('path');if(fs.existsSync('allure-report/history')){fs.mkdirSync('allure-results/history',{recursive:true});fs.cpSync('allure-report/history','allure-results/history',{recursive:true});console.log('✅ History copied successfully')}else{console.log('⚠️ No history found (normal for first run)')}\"",
+    "allure:clean": "node -e \"const fs=require('fs');['allure-results','allure-report'].forEach(d=>{if(fs.existsSync(d))fs.rmSync(d,{recursive:true,force:true})});console.log('✅ Cleaned allure directories')\"",
+    "allure:generate": "npm run allure:history && allure generate allure-results --clean -o allure-report",
     "allure:open": "allure open allure-report",
-    "allure:serve": "allure serve allure-results"
+    "allure:serve": "allure serve allure-results",
+    "test:allure": "npm test && npm run allure:generate && npm run allure:open"
   },
   "keywords": [
     "playwright",

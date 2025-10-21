@@ -75,41 +75,29 @@ jobs:
           npm test
         fi
 
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
-
-    - name: Upload test results JSON
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: test-results/
-        retention-days: 30
-
     - name: Get Allure history
       if: always()
       continue-on-error: true
       run: |
-        # Try to get allure history from gh-pages
-        if git clone --depth 1 --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages-allure 2>/dev/null; then
+        # Try to get allure history from gh-pages branch
+        if git clone --depth 1 --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages-temp 2>/dev/null; then
           echo "✅ Found gh-pages branch"
-          if [ -d "gh-pages-allure/allure-history" ]; then
+          if [ -d "gh-pages-temp/history" ]; then
             mkdir -p allure-results/history
-            cp -r gh-pages-allure/allure-history/* allure-results/history/
-            echo "✅ Copied Allure history"
+            cp -r gh-pages-temp/history/* allure-results/history/
+            echo "✅ Copied Allure history for trend charts"
+          else
+            echo "⚠️ No history directory found in gh-pages (normal for first run)"
           fi
-          rm -rf gh-pages-allure
+          rm -rf gh-pages-temp
         else
           echo "⚠️ No gh-pages branch found (normal for first run)"
         fi
     
-    - name: Generate Allure Report
+    - name: Generate Allure Report with History
       if: always()
+      # Generates Allure report with historical trend data
+      # The history from previous runs enables trend charts and graphs
       uses: simple-elf/allure-report-action@master
       with:
         allure_results: allure-results
@@ -141,235 +129,48 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout repository for template
-        uses: actions/checkout@v4
-        with:
-          path: repo
-      
-      - name: Setup gh-pages directory
-        run: |
-          # Try to clone gh-pages branch with full history
-          echo "🔍 Attempting to clone gh-pages branch..."
-          if git clone --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages 2>/dev/null; then
-            echo "✅ Successfully cloned gh-pages branch"
-            cd gh-pages
-            echo "📊 Current reports:"
-            ls -la reports/ 2>/dev/null || echo "  No reports directory yet"
-            cd ..
-          else
-            echo "⚠️ gh-pages branch not found (this is normal for first run)"
-            echo "📁 Creating new gh-pages directory"
-            mkdir -p gh-pages
-          fi
-      
-      - name: Download Playwright HTML report
-        uses: actions/download-artifact@v4
-        with:
-          name: playwright-report
-          path: ./current-report
-      
       - name: Download Allure report
         uses: actions/download-artifact@v4
         with:
           name: allure-report
-          path: ./current-allure-report
+          path: allure-report
       
       - name: Download Allure history
         uses: actions/download-artifact@v4
         with:
           name: allure-history
-          path: ./allure-history
+          path: allure-history
         continue-on-error: true
       
-      - name: Download test results JSON
-        uses: actions/download-artifact@v4
-        with:
-          name: test-results
-          path: ./test-results
-        continue-on-error: true
-      
-      - name: Prepare history and index page
+      - name: Prepare Allure Report for deployment
         run: |
-          # Debug: Check what we have
-          echo "🔍 Checking downloaded artifacts..."
-          ls -la current-report/ || echo "⚠️ current-report not found"
-          ls -la current-allure-report/ || echo "⚠️ current-allure-report not found"
-          ls -la test-results/ || echo "⚠️ test-results not found"
+          echo "📊 Preparing Allure Report for GitHub Pages..."
           
-          # Create reports directory
-          mkdir -p gh-pages/reports
+          # Create deployment directory
+          mkdir -p gh-pages
           
-          # Generate report directory name
-          TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
-          RUN_NUMBER=${{ github.run_number }}
-          REPORT_DIR="gh-pages/reports/run-${RUN_NUMBER}-${TIMESTAMP}"
-          
-          echo "📁 Creating report directory: $REPORT_DIR"
-          
-          # Copy current Playwright HTML report to history
-          if [ -d "current-report" ] && [ "$(ls -A current-report)" ]; then
-            mkdir -p "$REPORT_DIR"
-            cp -r current-report/* "$REPORT_DIR/"
-            echo "✅ Playwright HTML report copied successfully"
-            echo "📄 Files in report:"
-            ls -la "$REPORT_DIR/" | head -10
+          # Copy Allure report to deployment directory
+          if [ -d "allure-report" ] && [ "$(ls -A allure-report)" ]; then
+            cp -r allure-report/* gh-pages/
+            echo "✅ Allure report copied successfully"
+            ls -la gh-pages/ | head -10
           else
-            echo "❌ ERROR: current-report directory not found or empty"
-            echo "This should not happen - check the upload artifacts step"
+            echo "❌ ERROR: Allure report not found or empty"
             exit 1
           fi
           
-          # Copy current Allure report to history
-          if [ -d "current-allure-report" ] && [ "$(ls -A current-allure-report)" ]; then
-            mkdir -p "$REPORT_DIR/allure"
-            cp -r current-allure-report/* "$REPORT_DIR/allure/"
-            echo "✅ Allure report copied successfully"
-            echo "📄 Files in allure report:"
-            ls -la "$REPORT_DIR/allure/" | head -10
-          else
-            echo "⚠️ Allure report not found, skipping"
-          fi
-          
-          # Copy Allure history for trends
+          # Preserve Allure history for trend charts (stored in gh-pages branch)
           if [ -d "allure-history" ] && [ "$(ls -A allure-history)" ]; then
-            mkdir -p "gh-pages/allure-history"
-            cp -r allure-history/* "gh-pages/allure-history/"
+            mkdir -p gh-pages/history
+            cp -r allure-history/* gh-pages/history/
             echo "✅ Allure history preserved for trends"
-          fi
-          
-          # Extract test statistics from JSON
-          TOTAL_TESTS=0
-          PASSED_TESTS=0
-          FAILED_TESTS=0
-          SKIPPED_TESTS=0
-          DURATION="N/A"
-          
-          echo ""
-          echo "📊 Extracting test statistics..."
-          
-          if [ -f "test-results/results.json" ]; then
-            echo "✅ Found results.json"
-            
-            # Install jq if not available
-            if ! command -v jq &> /dev/null; then
-              echo "📦 Installing jq..."
-              sudo apt-get update -qq
-              sudo apt-get install -y jq
-            fi
-            
-            # Parse JSON with better error handling
-            TOTAL_TESTS=$(jq -r '[.suites[]?.specs[]?] | length' test-results/results.json 2>/dev/null || echo "0")
-            PASSED_TESTS=$(jq -r '[.suites[]?.specs[]?.tests[]? | select(.status == "expected")] | length' test-results/results.json 2>/dev/null || echo "0")
-            FAILED_TESTS=$(jq -r '[.suites[]?.specs[]?.tests[]? | select(.status == "unexpected")] | length' test-results/results.json 2>/dev/null || echo "0")
-            SKIPPED_TESTS=$(jq -r '[.suites[]?.specs[]?.tests[]? | select(.status == "skipped")] | length' test-results/results.json 2>/dev/null || echo "0")
-            DURATION_MS=$(jq -r '.stats.duration // 0' test-results/results.json 2>/dev/null || echo "0")
-            
-            # Convert duration to human readable format
-            if [ "$DURATION_MS" != "0" ] && [ "$DURATION_MS" != "null" ]; then
-              DURATION_SECONDS=$((DURATION_MS / 1000))
-              MINUTES=$((DURATION_SECONDS / 60))
-              SECONDS=$((DURATION_SECONDS % 60))
-              if [ $MINUTES -gt 0 ]; then
-                DURATION="${MINUTES}m ${SECONDS}s"
-              else
-                DURATION="${SECONDS}s"
-              fi
-            fi
-            
-            echo "  Total: $TOTAL_TESTS"
-            echo "  Passed: $PASSED_TESTS"
-            echo "  Failed: $FAILED_TESTS"
-            echo "  Skipped: $SKIPPED_TESTS"
-            echo "  Duration: $DURATION"
           else
-            echo "⚠️ results.json not found, using default values"
+            echo "⚠️ No Allure history found (normal for first run)"
           fi
           
           echo ""
-          echo "📝 Generating report list..."
-          
-          # List all reports in the directory
-          echo "Current reports in gh-pages/reports:"
-          ls -la gh-pages/reports/ || echo "No reports yet"
-          
-          # Generate report list HTML
-          REPORT_LIST=""
-          REPORT_COUNT=0
-          FIRST=true
-          LATEST_DATE="N/A"
-          
-          # List reports (newest first)
-          for report in $(ls -t gh-pages/reports 2>/dev/null); do
-            REPORT_COUNT=$((REPORT_COUNT + 1))
-            RUN=$(echo $report | cut -d'-' -f2)
-            DATE=$(echo $report | sed 's/run-[0-9]*-//' | sed 's/_/ /' | sed 's/-/:/g')
-            
-            echo "  - Found report: $report (Run #$RUN)"
-            
-            # Check if allure report exists for this run
-            ALLURE_BUTTON=""
-            if [ -d "gh-pages/reports/$report/allure" ]; then
-              ALLURE_BUTTON="<a class='view-button allure' href='reports/$report/allure/index.html'>📊 Allure</a>"
-            fi
-            
-            if [ "$FIRST" = true ]; then
-              LATEST_DATE="Run #$RUN"
-              REPORT_LIST+="<li class='report-item latest'>"
-              REPORT_LIST+="  <div class='report-info'>"
-              REPORT_LIST+="    <div class='report-title'>Run #$RUN <span class='badge'>Latest</span></div>"
-              REPORT_LIST+="    <div class='report-meta'>📅 $DATE</div>"
-              REPORT_LIST+="  </div>"
-              REPORT_LIST+="  <div class='report-buttons'>"
-              REPORT_LIST+="    <a class='view-button' href='reports/$report/index.html'>🎭 Playwright</a>"
-              REPORT_LIST+="    $ALLURE_BUTTON"
-              REPORT_LIST+="  </div>"
-              REPORT_LIST+="</li>"
-              FIRST=false
-            else
-              REPORT_LIST+="<li class='report-item'>"
-              REPORT_LIST+="  <div class='report-info'>"
-              REPORT_LIST+="    <div class='report-title'>Run #$RUN</div>"
-              REPORT_LIST+="    <div class='report-meta'>📅 $DATE</div>"
-              REPORT_LIST+="  </div>"
-              REPORT_LIST+="  <div class='report-buttons'>"
-              REPORT_LIST+="    <a class='view-button' href='reports/$report/index.html'>🎭 Playwright</a>"
-              REPORT_LIST+="    $ALLURE_BUTTON"
-              REPORT_LIST+="  </div>"
-              REPORT_LIST+="</li>"
-            fi
-          done
-          
-          echo ""
-          echo "📊 Summary:"
-          echo "  Total reports found: $REPORT_COUNT"
-          echo "  Latest: $LATEST_DATE"
-          
-          # If no reports found (should not happen since we just added one)
-          if [ $REPORT_COUNT -eq 0 ]; then
-            REPORT_LIST="<li class='report-item'><div class='report-info'><div class='report-title'>No reports available yet</div></div></li>"
-            echo "⚠️ Warning: No reports found after copying!"
-          fi
-          
-          # Create index.html from template
-          echo ""
-          echo "📄 Creating index.html from template..."
-          cp repo/.github/templates/reports-index.html gh-pages/index.html
-          
-          # Replace placeholders
-          sed -i "s|<!-- Reports will be inserted here -->|$REPORT_LIST|g" gh-pages/index.html
-          sed -i "s|{{TOTAL_RUNS}}|$REPORT_COUNT|g" gh-pages/index.html
-          sed -i "s|{{LATEST_RUN}}|$LATEST_DATE|g" gh-pages/index.html
-          sed -i "s|{{TOTAL_TESTS}}|$TOTAL_TESTS|g" gh-pages/index.html
-          sed -i "s|{{PASSED_TESTS}}|$PASSED_TESTS|g" gh-pages/index.html
-          sed -i "s|{{FAILED_TESTS}}|$FAILED_TESTS|g" gh-pages/index.html
-          sed -i "s|{{SKIPPED_TESTS}}|$SKIPPED_TESTS|g" gh-pages/index.html
-          sed -i "s|{{DURATION}}|$DURATION|g" gh-pages/index.html
-          
-          echo ""
-          echo "✅ Index page created successfully!"
-          echo "   Reports: $REPORT_COUNT"
-          echo "   Tests: $TOTAL_TESTS (✅ $PASSED_TESTS | ❌ $FAILED_TESTS | ⏭️ $SKIPPED_TESTS)"
-          echo "   Duration: $DURATION"
+          echo "✅ Allure Report prepared for deployment!"
+          echo "   The report will be available at: https://<username>.github.io/<repository>/"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

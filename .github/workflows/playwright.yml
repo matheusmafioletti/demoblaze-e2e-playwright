@@ -47,7 +47,7 @@ jobs:
 
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
-
+    
     - name: Run Playwright tests
       run: |
         # Determine which projects to run
@@ -91,12 +91,31 @@ jobs:
         path: test-results/
         retention-days: 30
 
+    - name: Get Allure history
+      if: always()
+      continue-on-error: true
+      run: |
+        # Try to get allure history from gh-pages
+        if git clone --depth 1 --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages-allure 2>/dev/null; then
+          echo "✅ Found gh-pages branch"
+          if [ -d "gh-pages-allure/allure-history" ]; then
+            mkdir -p allure-results/history
+            cp -r gh-pages-allure/allure-history/* allure-results/history/
+            echo "✅ Copied Allure history"
+          fi
+          rm -rf gh-pages-allure
+        else
+          echo "⚠️ No gh-pages branch found (normal for first run)"
+        fi
+    
     - name: Generate Allure Report
       if: always()
-      run: |
-        echo "📊 Generating Allure Report..."
-        npm run allure:generate
-        echo "✅ Allure Report generated successfully"
+      uses: simple-elf/allure-report-action@master
+      with:
+        allure_results: allure-results
+        allure_report: allure-report
+        allure_history: allure-history
+        keep_reports: 20
     
     - name: Upload Allure Report
       uses: actions/upload-artifact@v4
@@ -104,6 +123,14 @@ jobs:
       with:
         name: allure-report
         path: allure-report/
+        retention-days: 30
+    
+    - name: Upload Allure History
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: allure-history
+        path: allure-history/
         retention-days: 30
 
   deploy:
@@ -146,6 +173,13 @@ jobs:
         with:
           name: allure-report
           path: ./current-allure-report
+      
+      - name: Download Allure history
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-history
+          path: ./allure-history
+        continue-on-error: true
       
       - name: Download test results JSON
         uses: actions/download-artifact@v4
@@ -194,6 +228,13 @@ jobs:
             ls -la "$REPORT_DIR/allure/" | head -10
           else
             echo "⚠️ Allure report not found, skipping"
+          fi
+          
+          # Copy Allure history for trends
+          if [ -d "allure-history" ] && [ "$(ls -A allure-history)" ]; then
+            mkdir -p "gh-pages/allure-history"
+            cp -r allure-history/* "gh-pages/allure-history/"
+            echo "✅ Allure history preserved for trends"
           fi
           
           # Extract test statistics from JSON

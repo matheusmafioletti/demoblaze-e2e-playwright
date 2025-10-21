@@ -75,6 +75,30 @@ jobs:
           npm test
         fi
 
+    - name: Get Allure history from gh-pages
+      if: always()
+      continue-on-error: true
+      run: |
+        echo "📜 Fetching Allure history from gh-pages branch..."
+        
+        # Clone gh-pages branch to get previous history
+        if git clone --depth 1 --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages 2>/dev/null; then
+          echo "✅ Found gh-pages branch with history"
+          
+          # Check what's in the history directory
+          if [ -d "gh-pages/history/last-history" ]; then
+            echo "📊 Found last-history directory:"
+            ls -la gh-pages/history/last-history/ || true
+          else
+            echo "⚠️ No last-history found (normal for early runs)"
+          fi
+        else
+          echo "⚠️ No gh-pages branch found (normal for first run)"
+          mkdir -p gh-pages
+        fi
+        
+        echo "✅ gh-pages directory prepared for allure-report-action"
+
     - name: Generate Allure Report with History
       if: always()
       # Generates Allure report with historical trend data

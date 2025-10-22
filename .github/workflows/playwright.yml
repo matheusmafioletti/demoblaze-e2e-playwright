@@ -75,41 +75,18 @@ jobs:
           npm test
         fi
 
-    - name: Get Allure history from gh-pages
-      if: always()
-      continue-on-error: true
-      run: |
-        echo "📜 Fetching Allure history from gh-pages branch..."
-        
-        # Clone gh-pages branch to get previous history
-        if git clone --depth 1 --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages 2>/dev/null; then
-          echo "✅ Found gh-pages branch with history"
-          
-          # Check what's in the history directory
-          if [ -d "gh-pages/history/last-history" ]; then
-            echo "📊 Found last-history directory:"
-            ls -la gh-pages/history/last-history/ || true
-          else
-            echo "⚠️ No last-history found (normal for early runs)"
-          fi
-        else
-          echo "⚠️ No gh-pages branch found (normal for first run)"
-          mkdir -p gh-pages
-        fi
-        
-        echo "✅ gh-pages directory prepared for allure-report-action"
-
     - name: Generate Allure Report with History
       if: always()
-      # Generates Allure report with historical trend data
-      # The history from previous runs enables trend charts and graphs over time
+      # This action automatically:
+      # 1. Fetches history from gh-pages branch
+      # 2. Generates Allure report with trend data
+      # 3. Preserves history for next runs
       uses: simple-elf/allure-report-action@master
       with:
         allure_results: allure-results
         allure_report: allure-report
         allure_history: allure-history
         keep_reports: 20
-        gh_pages: gh-pages
     
     - name: Verify Allure History Generation
       if: always()
@@ -170,7 +147,6 @@ jobs:
       - name: Prepare Allure Report for deployment
         run: |
           echo "📊 Preparing Allure Report for GitHub Pages..."
-          echo ""
           
           # Create deployment directory
           mkdir -p gh-pages
@@ -180,45 +156,24 @@ jobs:
             echo "📄 Copying Allure report..."
             cp -r allure-report/* gh-pages/
             echo "✅ Allure report copied successfully"
-            echo ""
-            echo "📋 Report structure:"
-            ls -la gh-pages/ | head -15
           else
             echo "❌ ERROR: Allure report not found or empty"
             exit 1
           fi
           
-          echo ""
-          echo "📜 Processing Allure history..."
-          
-          # Preserve Allure history for next run
-          # The allure-history artifact contains the data needed for trend charts
+          # Preserve Allure history for next run (enables trend charts)
           if [ -d "allure-history" ] && [ "$(ls -A allure-history)" ]; then
-            echo "📋 Copying allure-history to gh-pages/history..."
-            mkdir -p gh-pages/history
-            cp -r allure-history/* gh-pages/history/
-            echo "✅ Allure history preserved for future runs"
-            echo ""
-            echo "📊 History files:"
-            ls -la gh-pages/history/
+            echo "📜 Preserving history for next run..."
+            cp -r allure-history gh-pages/
+            echo "✅ History preserved (trend charts will be available)"
           else
-            echo "⚠️ No allure-history artifact found (normal for first run)"
-            echo "   Trend charts will be available after the second run"
+            echo "⚠️ No history found (normal for first run)"
           fi
           
           echo ""
-          echo "🎯 Checking if report already contains history..."
-          if [ -d "allure-report/history" ]; then
-            echo "✅ Report contains history directory (trends will be visible)"
-            ls -la allure-report/history/ | head -10
-          else
-            echo "⚠️ Report does not contain history yet (normal for first run)"
-          fi
-          
-          echo ""
-          echo "✅ Allure Report prepared for deployment!"
-          echo "   📊 The report will be available at: https://<username>.github.io/<repository>/"
-          echo "   📈 Trend charts will show data after multiple runs"
+          echo "✅ Deployment package ready!"
+          echo "   📊 Report will be at: https://<username>.github.io/<repository>/"
+          echo "   📈 Trend charts will appear after multiple runs"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

@@ -149,35 +149,48 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download Allure History (Complete Report)
+      - name: Download Allure Report
         uses: actions/download-artifact@v4
         with:
-          name: allure-history
-          path: allure-history
+          name: allure-report
+          path: allure-report
       
-      - name: Prepare Allure Report for deployment
+      - name: Prepare deployment package
         run: |
           echo "📊 Preparing Allure Report for GitHub Pages..."
           
-          # Verify allure-history exists
-          if [ ! -d "allure-history" ] || [ ! "$(ls -A allure-history)" ]; then
-            echo "❌ ERROR: allure-history not found or empty"
+          # Verify allure-report exists
+          if [ ! -d "allure-report" ] || [ ! "$(ls -A allure-report)" ]; then
+            echo "❌ ERROR: allure-report not found or empty"
             exit 1
           fi
           
-          echo "✅ allure-history contains:"
-          ls -la allure-history/ | head -20
+          echo "📁 Report contents:"
+          ls -la allure-report/
           
-          # Check if history directory exists inside
-          if [ -d "allure-history/history" ]; then
+          # Create deployment directory structure
+          mkdir -p gh-pages
+          
+          # Copy report to root of gh-pages (this will be the website)
+          echo ""
+          echo "📄 Copying report to deployment directory..."
+          cp -r allure-report/* gh-pages/
+          
+          # Copy history to root for next run to find it
+          if [ -d "allure-report/history" ]; then
             echo ""
-            echo "📊 History data found:"
-            ls -la allure-history/history/
-            echo "✅ Trend charts will be visible in this report!"
+            echo "📊 Preserving history for next run..."
+            cp -r allure-report/history gh-pages/
+            echo "✅ History preserved at gh-pages/history/"
+            ls -la gh-pages/history/
           else
-            echo "⚠️ No history/ subdirectory yet (normal for first run)"
-            echo "   Trend charts will appear after 2+ runs"
+            echo "⚠️ No history in this run (will be created after first run)"
           fi
+          
+          echo ""
+          echo "✅ Deployment package ready!"
+          echo "📊 Final structure:"
+          ls -la gh-pages/ | head -20
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -185,7 +198,7 @@ jobs:
       - name: Upload to Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'allure-history'
+          path: 'gh-pages'
           
       - name: Deploy to GitHub Pages
         id: deployment

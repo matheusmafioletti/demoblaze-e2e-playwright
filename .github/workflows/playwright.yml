@@ -75,30 +75,43 @@ jobs:
           npm test
         fi
 
-    - name: Get history from gh-pages
+    - name: Checkout gh-pages branch for history
       if: always()
       continue-on-error: true
+      uses: actions/checkout@v4
+      with:
+        ref: gh-pages
+        path: gh-pages-dir
+    
+    - name: Copy history to allure-results
+      if: always()
       run: |
-        echo "📜 Attempting to fetch Allure history from gh-pages..."
+        echo "📜 Looking for Allure history from previous run..."
         
-        # Try to checkout gh-pages branch
-        if git fetch origin gh-pages --depth=1 2>/dev/null; then
-          echo "✅ Found gh-pages branch"
-          
-          # Checkout only the history directory
-          git checkout origin/gh-pages -- history 2>/dev/null || echo "⚠️ No history directory found in gh-pages"
-          
-          # If history exists, copy it to allure-results
-          if [ -d "history" ]; then
-            echo "📊 Copying history to allure-results..."
-            cp -r history allure-results/
-            echo "✅ History copied successfully"
-            ls -la allure-results/history/
-          else
-            echo "⚠️ No history found (normal for first run)"
-          fi
+        if [ -d "gh-pages-dir/history" ]; then
+          echo "✅ Found history in gh-pages branch"
+          echo "📊 Copying history to allure-results..."
+          cp -r gh-pages-dir/history allure-results/
+          echo "✅ History copied successfully"
+          echo ""
+          echo "📁 History contents:"
+          ls -la allure-results/history/
+        elif [ -d "gh-pages-dir" ]; then
+          echo "⚠️ gh-pages branch exists but no history/ directory found"
+          echo "   (This is normal for the first run)"
+          echo ""
+          echo "📁 Contents of gh-pages:"
+          ls -la gh-pages-dir/ | head -15
         else
           echo "⚠️ No gh-pages branch yet (normal for first run)"
+          echo "   History will be created after this run"
+        fi
+        
+        # Clean up temporary directory
+        if [ -d "gh-pages-dir" ]; then
+          rm -rf gh-pages-dir
+          echo ""
+          echo "🧹 Cleaned up temporary gh-pages-dir"
         fi
 
     - name: Generate Allure Report

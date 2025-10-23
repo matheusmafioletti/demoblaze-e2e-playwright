@@ -37,6 +37,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Download history from previous run
+      if: always()
+      continue-on-error: true
+      uses: dawidd6/action-download-artifact@v3
+      with:
+        name: history
+        path: allure-history-previous
+        workflow: playwright.yml
+        branch: main
+        workflow_conclusion: success
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -75,43 +86,23 @@ jobs:
           npm test
         fi
 
-    - name: Checkout gh-pages branch for history
-      if: always()
-      continue-on-error: true
-      uses: actions/checkout@v4
-      with:
-        ref: gh-pages
-        path: gh-pages-dir
-    
     - name: Copy history to allure-results
       if: always()
       run: |
         echo "📜 Looking for Allure history from previous run..."
         
-        if [ -d "gh-pages-dir/history" ]; then
-          echo "✅ Found history in gh-pages branch"
+        if [ -d "allure-history-previous" ]; then
+          echo "✅ Found history artifact from previous run"
           echo "📊 Copying history to allure-results..."
-          cp -r gh-pages-dir/history allure-results/
+          mkdir -p allure-results/history
+          cp -r allure-history-previous/* allure-results/history/
           echo "✅ History copied successfully"
           echo ""
           echo "📁 History contents:"
           ls -la allure-results/history/
-        elif [ -d "gh-pages-dir" ]; then
-          echo "⚠️ gh-pages branch exists but no history/ directory found"
-          echo "   (This is normal for the first run)"
-          echo ""
-          echo "📁 Contents of gh-pages:"
-          ls -la gh-pages-dir/ | head -15
         else
-          echo "⚠️ No gh-pages branch yet (normal for first run)"
+          echo "⚠️ No history artifact found (normal for first run)"
           echo "   History will be created after this run"
-        fi
-        
-        # Clean up temporary directory
-        if [ -d "gh-pages-dir" ]; then
-          rm -rf gh-pages-dir
-          echo ""
-          echo "🧹 Cleaned up temporary gh-pages-dir"
         fi
 
     - name: Generate Allure Report
@@ -153,6 +144,15 @@ jobs:
         name: allure-report
         path: allure-report/
         retention-days: 30
+    
+    - name: Upload history for next run
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: history
+        path: allure-report/history/
+        retention-days: 90
+        overwrite: true
 
   deploy:
     needs: test
@@ -181,29 +181,18 @@ jobs:
           echo "📁 Report contents:"
           ls -la allure-report/
           
-          # Create deployment directory structure
-          mkdir -p gh-pages
-          
-          # Copy report to root of gh-pages (this will be the website)
-          echo ""
-          echo "📄 Copying report to deployment directory..."
-          cp -r allure-report/* gh-pages/
-          
-          # Copy history to root for next run to find it
           if [ -d "allure-report/history" ]; then
             echo ""
-            echo "📊 Preserving history for next run..."
-            cp -r allure-report/history gh-pages/
-            echo "✅ History preserved at gh-pages/history/"
-            ls -la gh-pages/history/
+            echo "✅ Report contains history (trend charts will be visible)"
+            echo "📊 History files:"
+            ls -la allure-report/history/
           else
-            echo "⚠️ No history in this run (will be created after first run)"
+            echo ""
+            echo "⚠️ No history in report (normal for first run)"
           fi
           
           echo ""
-          echo "✅ Deployment package ready!"
-          echo "📊 Final structure:"
-          ls -la gh-pages/ | head -20
+          echo "✅ Report ready for deployment!"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -211,7 +200,7 @@ jobs:
       - name: Upload to Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'gh-pages'
+          path: 'allure-report'
           
       - name: Deploy to GitHub Pages
         id: deployment

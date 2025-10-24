@@ -2,9 +2,9 @@ name: Playwright Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       browser:
@@ -42,10 +42,10 @@ jobs:
       continue-on-error: true
       uses: dawidd6/action-download-artifact@v3
       with:
-        name: history
+        name: history-${{ github.ref_name }}
         path: allure-history-previous
         workflow: playwright.yml
-        branch: main
+        branch: ${{ github.ref_name }}
         workflow_conclusion: success
 
     - name: Setup Node.js
@@ -203,14 +203,14 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always() && hashFiles('allure-report/history/**') != ''
       with:
-        name: history
+        name: history-${{ github.ref_name }}
         path: allure-report/history/
         retention-days: 90
         overwrite: true
 
   deploy:
     needs: test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

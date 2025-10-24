@@ -59,6 +59,28 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
     
+    - name: Prepare history before tests
+      if: always()
+      run: |
+        echo "📜 Preparing Allure history before running tests..."
+        
+        if [ -d "allure-history-previous" ]; then
+          echo "✅ Found history artifact from previous run"
+          echo "📊 Copying history to allure-results..."
+          mkdir -p allure-results/history
+          cp -r allure-history-previous/* allure-results/history/
+          echo "✅ History copied successfully"
+          echo ""
+          echo "📁 History contents:"
+          ls -la allure-results/history/
+          echo ""
+          echo "✅ History is ready - trend widgets will be generated"
+        else
+          echo "⚠️ No history artifact found (normal for first run)"
+          echo "   History will be created after this run"
+          echo "   Trend widgets will appear starting from run #2"
+        fi
+    
     - name: Run Playwright tests
       run: |
         # Determine which projects to run
@@ -86,30 +108,24 @@ jobs:
           npm test
         fi
 
-    - name: Copy history to allure-results
-      if: always()
-      run: |
-        echo "📜 Looking for Allure history from previous run..."
-        
-        if [ -d "allure-history-previous" ]; then
-          echo "✅ Found history artifact from previous run"
-          echo "📊 Copying history to allure-results..."
-          mkdir -p allure-results/history
-          cp -r allure-history-previous/* allure-results/history/
-          echo "✅ History copied successfully"
-          echo ""
-          echo "📁 History contents:"
-          ls -la allure-results/history/
-        else
-          echo "⚠️ No history artifact found (normal for first run)"
-          echo "   History will be created after this run"
-        fi
-
     - name: Generate Allure Report
       if: always()
       run: |
         echo "📊 Generating Allure Report..."
+        
+        # Check if history exists before generation
+        if [ -d "allure-results/history" ]; then
+          echo "✅ History found in allure-results - trends will be generated"
+          ls -la allure-results/history/
+        else
+          echo "⚠️ No history in allure-results (first run)"
+        fi
+        
+        echo ""
+        echo "🔧 Running allure generate..."
         npx allure generate allure-results --clean -o allure-report
+        
+        echo ""
         echo "✅ Allure report generated successfully"
     
     - name: Verify Allure Report
@@ -127,10 +143,28 @@ jobs:
             echo ""
             echo "📊 History directory found in report:"
             ls -la allure-report/history/
-            echo "✅ Trend charts will be visible!"
           else
             echo "⚠️ No history/ in report (normal for first run)"
-            echo "   Trend charts will appear after 2+ runs"
+          fi
+          
+          echo ""
+          echo "📈 Checking widgets directory for trends:"
+          if [ -d "allure-report/widgets" ]; then
+            ls -la allure-report/widgets/
+            echo ""
+            echo "🔍 Looking for trend widgets:"
+            ls allure-report/widgets/ | grep -i trend || echo "   ⚠️ No trend widgets found!"
+            
+            # Check if trend files exist
+            TREND_COUNT=$(ls allure-report/widgets/*trend* 2>/dev/null | wc -l)
+            if [ "$TREND_COUNT" -gt 0 ]; then
+              echo "   ✅ Found $TREND_COUNT trend widget files"
+            else
+              echo "   ❌ No trend widgets generated!"
+              echo "   This is why trends don't appear in the UI"
+            fi
+          else
+            echo "❌ Widgets directory not found!"
           fi
         else
           echo "❌ allure-report directory not found!"
@@ -145,9 +179,29 @@ jobs:
         path: allure-report/
         retention-days: 30
     
+    - name: Check if history was generated
+      if: always()
+      run: |
+        echo "🔍 Checking history generation..."
+        if [ -d "allure-report/history" ] && [ "$(ls -A allure-report/history)" ]; then
+          echo "✅ History directory exists and is not empty"
+          echo "📊 Files in history:"
+          ls -la allure-report/history/
+          echo ""
+          echo "📄 Checking history.json content:"
+          if [ -f "allure-report/history/history.json" ]; then
+            echo "File size: $(wc -c < allure-report/history/history.json) bytes"
+            head -c 500 allure-report/history/history.json || true
+          fi
+        else
+          echo "⚠️ History directory is empty or doesn't exist"
+          echo "   This is normal for the first run"
+          echo "   Trends will appear starting from the second run"
+        fi
+    
     - name: Upload history for next run
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && hashFiles('allure-report/history/**') != ''
       with:
         name: history
         path: allure-report/history/
@@ -178,17 +232,46 @@ jobs:
             exit 1
           fi
           
-          echo "📁 Report contents:"
+          echo "📁 Report root contents:"
           ls -la allure-report/
           
+          echo ""
+          echo "📂 Checking critical files for trends:"
+          
+          # Check widgets directory
+          if [ -d "allure-report/widgets" ]; then
+            echo "✅ widgets/ directory exists"
+            echo "📂 All widgets:"
+            ls -la allure-report/widgets/
+            echo ""
+            echo "🔍 Trend widget files:"
+            ls allure-report/widgets/ | grep -E "trend" || echo "   ⚠️ No trend widgets found!"
+          fi
+          
+          # Check history directory  
           if [ -d "allure-report/history" ]; then
             echo ""
-            echo "✅ Report contains history (trend charts will be visible)"
-            echo "📊 History files:"
+            echo "✅ history/ directory exists"
             ls -la allure-report/history/
+            
+            echo ""
+            echo "📊 Checking history.json:"
+            if [ -f "allure-report/history/history.json" ]; then
+              FILE_SIZE=$(wc -c < allure-report/history/history.json)
+              echo "   File size: $FILE_SIZE bytes"
+              if [ "$FILE_SIZE" -gt 100 ]; then
+                echo "   ✅ History has data (trends should be visible)"
+              else
+                echo "   ⚠️ History file is too small (may not have enough data yet)"
+              fi
+            else
+              echo "   ❌ history.json not found!"
+            fi
           else
             echo ""
-            echo "⚠️ No history in report (normal for first run)"
+            echo "⚠️ No history/ directory in report"
+            echo "   This means no trends will be visible yet"
+            echo "   (Normal for first run - trends appear from run #2 onwards)"
           fi
           
           echo ""

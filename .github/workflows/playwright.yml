@@ -208,6 +208,25 @@ jobs:
         retention-days: 90
         overwrite: true
 
+  # Status check job for PR protection
+  test-status:
+    name: Test Status Check
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "✅ All tests passed successfully!"
+            echo "✅ PR can be merged"
+            exit 0
+          else
+            echo "❌ Tests failed or were cancelled"
+            echo "❌ PR cannot be merged until tests pass"
+            exit 1
+          fi
+
   deploy:
     needs: test
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name != 'pull_request'

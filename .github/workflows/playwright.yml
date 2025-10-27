@@ -37,12 +37,21 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Sanitize branch name for artifact
+      id: sanitize
+      run: |
+        # Replace forward slashes with hyphens for valid artifact names
+        BRANCH_NAME="${{ github.ref_name }}"
+        SAFE_BRANCH_NAME="${BRANCH_NAME//\//-}"
+        echo "safe_branch_name=$SAFE_BRANCH_NAME" >> $GITHUB_OUTPUT
+        echo "Using sanitized branch name: $SAFE_BRANCH_NAME"
+
     - name: Download history from previous run
       if: always()
       continue-on-error: true
       uses: dawidd6/action-download-artifact@v3
       with:
-        name: history-${{ replace(github.ref_name, '/', '-') }}
+        name: history-${{ steps.sanitize.outputs.safe_branch_name }}
         path: allure-history-previous
         workflow: playwright.yml
         branch: ${{ github.ref_name }}
@@ -203,7 +212,7 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always() && hashFiles('allure-report/history/**') != ''
       with:
-        name: history-${{ replace(github.ref_name, '/', '-') }}
+        name: history-${{ steps.sanitize.outputs.safe_branch_name }}
         path: allure-report/history/
         retention-days: 90
         overwrite: true

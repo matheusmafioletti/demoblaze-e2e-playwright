@@ -238,7 +238,7 @@ jobs:
 
   deploy:
     needs: test
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name != 'pull_request'
+    if: always()
     runs-on: ubuntu-latest
     environment:
       name: github-pages

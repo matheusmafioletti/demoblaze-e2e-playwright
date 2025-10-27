@@ -42,10 +42,9 @@ jobs:
       continue-on-error: true
       uses: dawidd6/action-download-artifact@v3
       with:
-        name: history-${{ github.ref_name }}
+        name: history
         path: allure-history-previous
         workflow: playwright.yml
-        branch: ${{ github.ref_name }}
         workflow_conclusion: success
 
     - name: Setup Node.js
@@ -203,14 +202,33 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always() && hashFiles('allure-report/history/**') != ''
       with:
-        name: history-${{ github.ref_name }}
+        name: history
         path: allure-report/history/
         retention-days: 90
         overwrite: true
 
+  # Status check job for PR protection
+  test-status:
+    name: Test Status Check
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "✅ All tests passed successfully!"
+            echo "✅ PR can be merged"
+            exit 0
+          else
+            echo "❌ Tests failed or were cancelled"
+            echo "❌ PR cannot be merged until tests pass"
+            exit 1
+          fi
+
   deploy:
     needs: test
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name != 'pull_request'
+    if: always()
     runs-on: ubuntu-latest
     environment:
       name: github-pages

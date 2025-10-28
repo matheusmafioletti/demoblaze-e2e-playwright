@@ -18,6 +18,36 @@ export class BasePage {
   async waitForNetworkIdle() {
     await this.page.waitForLoadState('networkidle');
   }
+  
+  async waitForDialog(): Promise<string> {
+    return new Promise((resolve) => {
+      this.page.once('dialog', async (dialog) => {
+        const message = dialog.message();
+        await dialog.accept();
+        resolve(message);
+      });
+    });
+  }
+
+  async waitForDialogAndDismiss(): Promise<string> {
+    return new Promise((resolve) => {
+      this.page.once('dialog', async (dialog) => {
+        const message = dialog.message();
+        await dialog.dismiss();
+        resolve(message);
+      });
+    });
+  }
+
+  async waitForDialogWithInput(inputText: string): Promise<string> {
+    return new Promise((resolve) => {
+      this.page.once('dialog', async (dialog) => {
+        const message = dialog.message();
+        await dialog.accept(inputText);
+        resolve(message);
+      });
+    });
+  }
 
   async clickElement(locator: Locator) {
     await locator.click();

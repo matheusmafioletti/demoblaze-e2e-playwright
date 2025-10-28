@@ -5,4 +5,5 @@ export { SignupPage } from './SignupPage';
 export { ProductPage } from './ProductPage';
 export { CartPage } from './CartPage';
 export { CheckoutPage } from './CheckoutPage';
+export { ContactPage } from './ContactPage';
 

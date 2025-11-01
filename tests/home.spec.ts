@@ -27,12 +27,12 @@ test.describe('Homepage - Basic Elements', () => {
     await expect(homePage.productContainer).toHaveCount(9);
   });
 
-  test('Should load homepage and click on next page, and previous page', async ({ homePage }) => {
+  test('Should navigate between pages using next and previous buttons', async ({ homePage }) => {
     await expect(homePage.pageNextButton).toBeVisible();
     await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.GALAXY_S6);
-    await homePage.pageNextButton.click();
+    await homePage.goToNextPage();
     await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.APPLE_MONITOR);
-    await homePage.pagePrevButton.click();
+    await homePage.goToPreviousPage();
     await expect(homePage.pageProducts.first()).toHaveText(Constants.PRODUCTS.LUMIA_1520);
   });
 
@@ -44,46 +44,46 @@ test.describe('Homepage - Carousel', () => {
     await homePage.goto();
   });
 
-  test('Should load homepage and wait for carousel image to change', async ({ homePage }) => {
+  test('Should automatically change carousel image after timeout', async ({ homePage }) => {
     await expect(homePage.carousel).toBeVisible();
     await expect(homePage.carouselItem).toHaveCount(3);
-    const initialActiveItem = await homePage.carouselImage.getAttribute('src');
-    const newActiveItem = await WaitHelper.waitForAttributeChange(
+    const initialImage = await homePage.getCurrentCarouselImage();
+    const newImage = await WaitHelper.waitForAttributeChange(
       homePage.carouselImage,
       'src',
-      initialActiveItem!,
+      initialImage,
       Constants.TIMEOUTS.MEDIUM
     );
-    expect(initialActiveItem).not.toBe(newActiveItem);
+    expect(initialImage).not.toBe(newImage);
     await expect(homePage.carouselActiveItem).toHaveCount(1);
   });
 
-  test('Should load homepage and click on next carousel item', async ({ homePage }) => {
+  test('Should navigate to next carousel item', async ({ homePage }) => {
     await expect(homePage.carousel).toBeVisible();
     await expect(homePage.carouselItem).toHaveCount(3);
-    const initialActiveItem = await homePage.carouselImage.getAttribute('src');
-    await homePage.carouselNextButton.click();
-    const newActiveItem = await WaitHelper.waitForAttributeChange(
+    const initialImage = await homePage.getCurrentCarouselImage();
+    await homePage.nextCarouselItem();
+    const newImage = await WaitHelper.waitForAttributeChange(
       homePage.carouselImage,
       'src',
-      initialActiveItem!,
+      initialImage,
       Constants.TIMEOUTS.MEDIUM
     );
-    expect(initialActiveItem).not.toBe(newActiveItem);
+    expect(initialImage).not.toBe(newImage);
   });
 
-  test('Should load homepage and click on previous carousel item', async ({ homePage }) => {
+  test('Should navigate to previous carousel item', async ({ homePage }) => {
     await expect(homePage.carousel).toBeVisible();
     await expect(homePage.carouselItem).toHaveCount(3);
-    const initialActiveItem = await homePage.carouselImage.getAttribute('src');
-    await homePage.carouselPrevButton.click();
-    const newActiveItem = await WaitHelper.waitForAttributeChange(
+    const initialImage = await homePage.getCurrentCarouselImage();
+    await homePage.previousCarouselItem();
+    const newImage = await WaitHelper.waitForAttributeChange(
       homePage.carouselImage,
       'src',
-      initialActiveItem!,
+      initialImage,
       Constants.TIMEOUTS.MEDIUM
-    ); 
-    expect(initialActiveItem).not.toBe(newActiveItem);
+    );
+    expect(initialImage).not.toBe(newImage);
   });
 
 });

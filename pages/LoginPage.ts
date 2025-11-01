@@ -17,9 +17,22 @@ export class LoginPage extends BasePage {
     this.closeButton = this.loginModal.locator('button.close');
   }
 
-  async openLoginModal() {
-    await this.page.locator('#login2').click();
+  async waitForModalToOpen() {
     await this.loginModal.waitFor({ state: 'visible' });
+  }
+
+  async fillLoginForm(username: string, password: string) {
+    await this.usernameInput.fill(username);
+    await this.passwordInput.fill(password);
+  }
+
+  async submitLogin() {
+    await this.loginButton.click();
+  }
+
+  async closeModal() {
+    await this.closeButton.click();
+    await this.loginModal.waitFor({ state: 'hidden' });
   }
 }
 

@@ -48,5 +48,45 @@ export class HomePage extends BasePage {
   async goto() {
     await this.navigate('/');
   }
+
+  async openContactModal() {
+    await this.contactLink.click();
+  }
+
+  async openAboutUsModal() {
+    await this.aboutLink.click();
+  }
+
+  async openLoginModal() {
+    await this.loginLink.click();
+  }
+
+  async openSignupModal() {
+    await this.signupLink.click();
+  }
+
+  async goToNextPage() {
+    await this.pageNextButton.click();
+  }
+
+  async goToPreviousPage() {
+    await this.pagePrevButton.click();
+  }
+
+  async nextCarouselItem() {
+    await this.carouselNextButton.click();
+  }
+
+  async previousCarouselItem() {
+    await this.carouselPrevButton.click();
+  }
+
+  async getFirstProductName(): Promise<string> {
+    return await this.pageProducts.first().textContent() || '';
+  }
+
+  async getCurrentCarouselImage(): Promise<string> {
+    return await this.carouselImage.getAttribute('src') || '';
+  }
 }
 

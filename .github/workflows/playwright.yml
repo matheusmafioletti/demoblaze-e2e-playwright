@@ -2,9 +2,9 @@ name: Playwright Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       browser:
@@ -45,7 +45,6 @@ jobs:
         name: history
         path: allure-history-previous
         workflow: playwright.yml
-        branch: main
         workflow_conclusion: success
 
     - name: Setup Node.js
@@ -208,9 +207,28 @@ jobs:
         retention-days: 90
         overwrite: true
 
+  # Status check job for PR protection
+  test-status:
+    name: Test Status Check
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "✅ All tests passed successfully!"
+            echo "✅ PR can be merged"
+            exit 0
+          else
+            echo "❌ Tests failed or were cancelled"
+            echo "❌ PR cannot be merged until tests pass"
+            exit 1
+          fi
+
   deploy:
     needs: test
-    if: github.ref == 'refs/heads/main'
+    if: always()
     runs-on: ubuntu-latest
     environment:
       name: github-pages

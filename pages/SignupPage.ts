@@ -17,9 +17,27 @@ export class SignupPage extends BasePage {
     this.closeButton = this.signupModal.locator('button.close');
   }
 
-  async openSignupModal() {
-    await this.page.locator('#signin2').click();
+  async waitForModalToOpen() {
     await this.signupModal.waitFor({ state: 'visible' });
+  }
+
+  async fillSignupForm(username: string, password: string) {
+    await this.usernameInput.fill(username);
+    await this.passwordInput.fill(password);
+  }
+
+  async submitSignup() {
+    await this.signupButton.click();
+  }
+
+  async signup(username: string, password: string) {
+    await this.fillSignupForm(username, password);
+    await this.submitSignup();
+  }
+
+  async closeModal() {
+    await this.closeButton.click();
+    await this.signupModal.waitFor({ state: 'hidden' });
   }
 }
 

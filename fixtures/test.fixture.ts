@@ -6,6 +6,7 @@ import { ProductPage } from '../pages/ProductPage';
 import { CartPage } from '../pages/CartPage';
 import { CheckoutPage } from '../pages/CheckoutPage';
 import { ContactPage } from '../pages/ContactPage';
+import { AboutUsPage } from '../pages/AboutUsPage';
 
 type PageFixtures = {
   homePage: HomePage;
@@ -15,6 +16,7 @@ type PageFixtures = {
   cartPage: CartPage;
   checkoutPage: CheckoutPage;
   contactPage: ContactPage;
+  aboutUsPage: AboutUsPage;
 };
 
 export const test = base.extend<PageFixtures>({
@@ -44,6 +46,10 @@ export const test = base.extend<PageFixtures>({
 
   contactPage: async ({ page }, use) => {
     await use(new ContactPage(page));
+  },
+
+  aboutUsPage: async ({ page }, use) => {
+    await use(new AboutUsPage(page));
   },
 });
 

@@ -53,6 +53,10 @@ export class HomePage extends BasePage {
     await this.contactLink.click();
   }
 
+  async openAboutUsModal() {
+    await this.aboutLink.click();
+  }
+
   async openLoginModal() {
     await this.loginLink.click();
   }
